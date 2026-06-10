@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { formatMXN, getISOWeek, balanceColor } from '@/lib/helpers'
+import { formatMXN, formatDate, getISOWeek, balanceColor, labelUnidad } from '@/lib/helpers'
 import PageHeader from '@/components/PageHeader'
 import StatCard from '@/components/StatCard'
 import {
-  TrendingUp,
-  TrendingDown,
-  Car,
-  ClipboardCheck,
-  Loader2,
+  TrendingUp, TrendingDown, Car, ClipboardCheck, Loader2,
+  AlertTriangle, CheckCircle, Clock, HelpCircle, Wrench,
 } from 'lucide-react'
+import { ITEMS_MANTENIMIENTO, getEstadoMantenimiento, ESTADO_STYLES } from '@/lib/mantenimiento'
+
+const ESTADO_ICON = {
+  ok:           <CheckCircle className="w-3.5 h-3.5" />,
+  proximo:      <Clock className="w-3.5 h-3.5" />,
+  vencido:      <AlertTriangle className="w-3.5 h-3.5" />,
+  sin_registro: <HelpCircle className="w-3.5 h-3.5" />,
+}
 import {
   BarChart,
   Bar,
@@ -32,6 +37,7 @@ export default function Dashboard() {
   const [unidades, setUnidades] = useState([])
   const [ingresosSemana, setIngresosSemana] = useState([])
   const [gastosSemana, setGastosSemana] = useState([])
+  const [gastosMantenimiento, setGastosMantenimiento] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -51,6 +57,7 @@ export default function Dashboard() {
         { count: pendientesCount },
         { data: ingresosMes },
         { data: gastosMes },
+        { data: gastosMantenimiento_ },
       ] = await Promise.all([
         supabase.from('unidades').select('id, numero, chofer, activa'),
         supabase.from('ingresos')
@@ -72,6 +79,11 @@ export default function Dashboard() {
           .select('monto')
           .eq('estado', 'aprobado')
           .gte('fecha', `${anioActual}-${String(now.getMonth() + 1).padStart(2, '0')}-01`),
+        supabase.from('gastos')
+          .select('unidad_id, mantenimiento_tipo, fecha, monto')
+          .not('mantenimiento_tipo', 'is', null)
+          .eq('estado', 'aprobado')
+          .order('fecha', { ascending: false }),
       ])
 
       const totalIngresosSemana = (ingresosSemana_ || []).reduce((s, r) => s + Number(r.monto), 0)
@@ -101,7 +113,7 @@ export default function Dashboard() {
           .filter(g => g.unidad_id === u.id)
           .reduce((s, r) => s + Number(r.monto), 0)
         return {
-          unidad: `#${u.numero}`,
+          unidad: labelUnidad(u),
           Ingresos: ing,
           Gastos: gas,
         }
@@ -112,6 +124,7 @@ export default function Dashboard() {
       setUnidades(unidades_ || [])
       setIngresosSemana(ingresosSemana_ || [])
       setGastosSemana(gastosSemana_ || [])
+      setGastosMantenimiento(gastosMantenimiento_ || [])
     } catch (err) {
       console.error('Error al cargar dashboard:', err)
     } finally {
@@ -187,7 +200,143 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Gráfica */}
+      {/* 1. Resumen por unidad */}
+      {unidades.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-display font-bold text-lg text-pizarra-100 mb-4">
+            Resumen por unidad (semana actual)
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {unidades.map(u => {
+              const ing = ingresosSemana
+                .filter(i => i.unidad_id === u.id)
+                .reduce((s, r) => s + Number(r.monto), 0)
+              const gas = gastosSemana
+                .filter(g => g.unidad_id === u.id)
+                .reduce((s, r) => s + Number(r.monto), 0)
+              const balance = ing - gas
+
+              return (
+                <div key={u.id} className="card p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono font-bold text-2xl text-taxi-400">
+                      {labelUnidad(u)}
+                    </span>
+                    <span className={u.activa ? 'badge-activa' : 'badge-inactiva'}>
+                      {u.activa ? 'Activa' : 'Inactiva'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-pizarra-500 mb-5">{u.chofer}</p>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-sm text-pizarra-400 flex items-center gap-1.5">
+                        <TrendingUp className="w-4 h-4" />
+                        Ingresos
+                      </span>
+                      <span className="text-base font-mono font-semibold text-emerald-400">
+                        {formatMXN(ing)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-sm text-pizarra-400 flex items-center gap-1.5">
+                        <TrendingDown className="w-4 h-4" />
+                        Gastos
+                      </span>
+                      <span className="text-base font-mono font-semibold text-red-400">
+                        {formatMXN(gas)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-pizarra-700/40 mt-4 pt-4 flex justify-between items-baseline">
+                    <span className="text-sm font-semibold text-pizarra-400 uppercase tracking-wider">
+                      Balance
+                    </span>
+                    <span className={`text-xl font-mono font-bold ${balanceColor(balance)}`}>
+                      {formatMXN(balance)}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. Mantenimiento preventivo */}
+      {unidades.filter(u => u.activa).length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Wrench className="w-5 h-5 text-pizarra-400" />
+            <h2 className="font-display font-bold text-lg text-pizarra-100">
+              Mantenimiento preventivo
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {unidades.filter(u => u.activa).map(u => {
+              const hoy = new Date()
+              const items = ITEMS_MANTENIMIENTO.map(item => {
+                const ultimo = gastosMantenimiento
+                  .filter(g => g.unidad_id === u.id && g.mantenimiento_tipo === item.tipo)
+                  .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0]
+                const diasTranscurridos = ultimo
+                  ? Math.floor((hoy - new Date(ultimo.fecha + 'T00:00:00')) / 86400000)
+                  : null
+                const estado = getEstadoMantenimiento(diasTranscurridos, item.diasAlerta)
+                return { ...item, diasTranscurridos, estado, ultimaFecha: ultimo?.fecha }
+              })
+              const alertas = items.filter(i => i.estado === 'vencido' || i.estado === 'sin_registro').length
+              const proximos = items.filter(i => i.estado === 'proximo').length
+
+              return (
+                <div key={u.id} className="card overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-pizarra-700/50">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-taxi-400">{labelUnidad(u)}</span>
+                      <span className="text-xs text-pizarra-500">{u.chofer}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {alertas > 0 && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+                          <AlertTriangle className="w-3 h-3" />{alertas}
+                        </span>
+                      )}
+                      {proximos > 0 && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <Clock className="w-3 h-3" />{proximos}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-pizarra-700/30">
+                    {items.map(item => {
+                      const style = ESTADO_STYLES[item.estado]
+                      return (
+                        <div key={item.tipo} className={`flex flex-col items-center gap-1 p-3 text-center ${style.bg}`}>
+                          <span className={`${style.text} mb-0.5`}>{ESTADO_ICON[item.estado]}</span>
+                          <span className="text-xs font-medium text-pizarra-300 leading-tight">{item.label}</span>
+                          {item.diasTranscurridos !== null ? (
+                            <span className={`text-xs font-bold ${style.text}`}>
+                              {item.diasTranscurridos === 0 ? 'Hoy'
+                                : item.diasTranscurridos < 30 ? `${item.diasTranscurridos}d`
+                                : `${Math.round(item.diasTranscurridos / 30)}m`}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-pizarra-600">Sin registro</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Ingresos vs Gastos */}
       {chartData.length > 0 && (
         <div className="card p-6 mb-8">
           <h2 className="font-display font-bold text-lg text-pizarra-100 mb-6">
@@ -219,84 +368,11 @@ export default function Dashboard() {
                   }}
                   formatter={(value) => [formatMXN(value), '']}
                 />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }}
-                />
+                <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} />
                 <Bar dataKey="Ingresos" fill="#34d399" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="Gastos" fill="#f87171" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Cuadrícula por unidad */}
-      {unidades.length > 0 && (
-        <div>
-          <h2 className="font-display font-bold text-lg text-pizarra-100 mb-4">
-            Resumen por unidad (semana actual)
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {unidades.map(u => {
-              const ing = ingresosSemana
-                .filter(i => i.unidad_id === u.id)
-                .reduce((s, r) => s + Number(r.monto), 0)
-              const gas = gastosSemana
-                .filter(g => g.unidad_id === u.id)
-                .reduce((s, r) => s + Number(r.monto), 0)
-              const balance = ing - gas
-
-              return (
-                <div key={u.id} className="card p-5">
-                  {/* Encabezado: número y estado */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono font-bold text-xl text-taxi-400">
-                      #{u.numero}
-                    </span>
-                    <span className={u.activa ? 'badge-activa' : 'badge-inactiva'}>
-                      {u.activa ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
-
-                  {/* Nombre del chofer */}
-                  <p className="text-xs text-pizarra-500 truncate mb-4">
-                    {u.chofer}
-                  </p>
-
-                  {/* Ingresos y gastos */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs text-pizarra-400 flex items-center gap-1">
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        Ingresos
-                      </span>
-                      <span className="text-sm font-mono font-semibold text-emerald-400">
-                        {formatMXN(ing)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs text-pizarra-400 flex items-center gap-1">
-                        <TrendingDown className="w-3.5 h-3.5" />
-                        Gastos
-                      </span>
-                      <span className="text-sm font-mono font-semibold text-red-400">
-                        {formatMXN(gas)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Balance */}
-                  <div className="border-t border-pizarra-700/40 mt-3 pt-3 flex justify-between items-baseline">
-                    <span className="text-xs font-semibold text-pizarra-400 uppercase tracking-wider">
-                      Balance
-                    </span>
-                    <span className={`text-base font-mono font-bold ${balanceColor(balance)}`}>
-                      {formatMXN(balance)}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
       )}

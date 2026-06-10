@@ -7,19 +7,22 @@ import {
   TrendingDown,
   ClipboardCheck,
   CalendarRange,
+  Wrench,
   LogOut,
   X,
   ChevronRight,
   UserPlus,
+  HandCoins,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/',              label: 'Dashboard',        icon: LayoutDashboard },
-  { to: '/unidades',      label: 'Unidades',         icon: Car },
-  { to: '/ingresos',      label: 'Ingresos',         icon: TrendingUp },
-  { to: '/gastos',        label: 'Gastos',           icon: TrendingDown },
-  { to: '/pendientes',    label: 'Pendientes',       icon: ClipboardCheck },
-  { to: '/resumen',       label: 'Resumen Semanal',  icon: CalendarRange },
+  { to: '/',              label: 'Dashboard',           icon: LayoutDashboard },
+  { to: '/unidades',      label: 'Unidades',            icon: Car },
+  { to: '/ingresos',      label: 'Ingresos',            icon: TrendingUp },
+  { to: '/gastos',        label: 'Gastos',              icon: TrendingDown },
+  { to: '/deudas',        label: 'Deudas',              icon: HandCoins },
+  { to: '/resumen',       label: 'Resumen Semanal',     icon: CalendarRange },
+  { to: '/resumen-v2',    label: 'Resumen Semanal V2',  icon: CalendarRange },
 ]
 
 export default function Sidebar({ open, onClose, onOpenCreateUser }) {

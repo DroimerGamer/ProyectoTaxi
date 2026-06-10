@@ -6,50 +6,48 @@ import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
 import {
   CalendarRange, ChevronLeft, ChevronRight, Loader2, Lock,
-  ChevronDown, Filter, TrendingUp, TrendingDown, X, AlertTriangle,
+  ChevronDown, Filter, TrendingUp, TrendingDown, AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import toast from 'react-hot-toast'
 import { ITEMS_MANTENIMIENTO } from '@/lib/mantenimiento'
 
-// Nombres exactos de las filas en categorias_gasto
 const NOMBRES_CATEGORIA = ['Mano de obra', 'Refacciones', 'Nómina']
-
-// Etiqueta legible (en este caso igual al nombre de BD)
 const LABEL_CATEGORIA = { 'Mano de obra': 'Mano de obra', 'Refacciones': 'Refacciones', 'Nómina': 'Nómina' }
 
-export default function ResumenSemanal() {
+export default function ResumenSemanalV2() {
   const { user, isAdmin } = useAuth()
-  const [unidades, setUnidades] = useState([])
-  const [ingresos, setIngresos] = useState([])
-  const [gastos, setGastos] = useState([])
+  const [unidades, setUnidades]     = useState([])
+  const [ingresos, setIngresos]     = useState([])
+  const [gastos, setGastos]         = useState([])
   const [categorias, setCategorias] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]       = useState(true)
 
   const now = new Date()
   const [semana, setSemana] = useState(getISOWeek(now))
-  const [anio, setAnio] = useState(now.getFullYear())
+  const [anio, setAnio]     = useState(now.getFullYear())
 
   // Filtros
-  const [filtroUnidad, setFiltroUnidad] = useState(null) // null = General
-  const [filtroGasto, setFiltroGasto] = useState(null)  // null = todos, o string nombre de BD
+  const [filtroUnidad, setFiltroUnidad]         = useState(null)  // null = General
+  const [filtroGasto, setFiltroGasto]           = useState(null)  // null = Todos
   const [showUnitDropdown, setShowUnitDropdown] = useState(false)
   const [showGastoDropdown, setShowGastoDropdown] = useState(false)
 
   // Modal agregar
-  const [clickedFecha, setClickedFecha] = useState(null)
-  const [tipoModalOpen, setTipoModalOpen] = useState(false)
-  const [tipoSeleccionado, setTipoSeleccionado] = useState(null) // 'ingreso' | 'gasto'
-  const [formModalOpen, setFormModalOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [clickedFecha, setClickedFecha]         = useState(null)
+  const [tipoPreselect, setTipoPreselect]       = useState(null)  // 'ingreso' | 'gasto' | null
+  const [tipoModalOpen, setTipoModalOpen]       = useState(false)
+  const [tipoSeleccionado, setTipoSeleccionado] = useState(null)
+  const [formModalOpen, setFormModalOpen]       = useState(false)
+  const [saving, setSaving]                     = useState(false)
   const [formIngreso, setFormIngreso] = useState({ unidad_id: '', fecha: '', monto: '', notas: '' })
-  const [formGasto, setFormGasto] = useState({ unidad_id: '', fecha: '', concepto: '', monto: '', categoria_id: '', mantenimiento_tipo: '', notas: '' })
-  const [alertaMant, setAlertaMant] = useState(null)
+  const [formGasto, setFormGasto]     = useState({ unidad_id: '', fecha: '', concepto: '', monto: '', categoria_id: '', mantenimiento_tipo: '', notas: '' })
+  const [alertaMant, setAlertaMant]   = useState(null)
   const [gastosRecientes, setGastosRecientes] = useState([])
   const [loadingRecientes, setLoadingRecientes] = useState(false)
   const [paginaMeses, setPaginaMeses] = useState(0)
 
-  const unitDropdownRef = useRef(null)
+  const unitDropdownRef  = useRef(null)
   const gastoDropdownRef = useRef(null)
 
   const { monday } = useMemo(() => getWeekRange(semana, anio), [semana, anio])
@@ -64,15 +62,12 @@ export default function ResumenSemanal() {
 
   useEffect(() => { fetchData() }, [semana, anio])
 
-  // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
     function handleClickOutside(e) {
-      if (unitDropdownRef.current && !unitDropdownRef.current.contains(e.target)) {
+      if (unitDropdownRef.current && !unitDropdownRef.current.contains(e.target))
         setShowUnitDropdown(false)
-      }
-      if (gastoDropdownRef.current && !gastoDropdownRef.current.contains(e.target)) {
+      if (gastoDropdownRef.current && !gastoDropdownRef.current.contains(e.target))
         setShowGastoDropdown(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -82,7 +77,7 @@ export default function ResumenSemanal() {
     setLoading(true)
     try {
       const fechaInicio = diasSemana[0]
-      const fechaFin = diasSemana[6]
+      const fechaFin    = diasSemana[6]
 
       const [{ data: u }, { data: ing }, { data: gas }, { data: cats }] = await Promise.all([
         supabase.from('unidades').select('id, numero, chofer').eq('activa', true).order('numero'),
@@ -107,16 +102,15 @@ export default function ResumenSemanal() {
   }
 
   function cambiarSemana(dir) {
-    let newSemana = semana + dir
-    let newAnio = anio
-    if (newSemana < 1) { newAnio--; newSemana = 52 }
-    else if (newSemana > 52) { newAnio++; newSemana = 1 }
-    setSemana(newSemana)
-    setAnio(newAnio)
+    let s = semana + dir, a = anio
+    if (s < 1)  { a--; s = 52 }
+    if (s > 52) { a++; s = 1  }
+    setSemana(s); setAnio(a)
   }
 
-  const tablaDias = useMemo(() => {
-    return diasSemana.map((fecha, i) => {
+  // Totales por día ya filtrados
+  const totalesPorDia = useMemo(() => {
+    return diasSemana.map(fecha => {
       const ingFiltrados = filtroUnidad
         ? ingresos.filter(r => r.unidad_id === filtroUnidad && r.fecha === fecha)
         : ingresos.filter(r => r.fecha === fecha)
@@ -129,54 +123,54 @@ export default function ResumenSemanal() {
         gasFiltrados = gasFiltrados.filter(g => g.categorias_gasto?.nombre === filtroGasto)
       }
 
-      const ingDia = ingFiltrados.reduce((s, r) => s + Number(r.monto), 0)
-      const gasDia = gasFiltrados.reduce((s, r) => s + Number(r.monto), 0)
-
-      return {
-        fecha,
-        diaNombre: DIAS_SEMANA[i],
-        ingresos: ingDia,
-        gastos: gasDia,
-        balance: ingDia - gasDia,
-        hasData: ingDia > 0 || gasDia > 0,
-      }
+      const ing = ingFiltrados.reduce((s, r) => s + Number(r.monto), 0)
+      const gas = gasFiltrados.reduce((s, r) => s + Number(r.monto), 0)
+      return { fecha, ing, gas, bal: ing - gas }
     })
   }, [diasSemana, ingresos, gastos, filtroUnidad, filtroGasto])
 
-  const totalIng = tablaDias.reduce((s, d) => s + d.ingresos, 0)
-  const totalGas = tablaDias.reduce((s, d) => s + d.gastos, 0)
+  const totalIng = totalesPorDia.reduce((s, d) => s + d.ing, 0)
+  const totalGas = totalesPorDia.reduce((s, d) => s + d.gas, 0)
   const totalBal = totalIng - totalGas
 
-  // Gran total general (sin filtros) para cerrar semana
+  // Gran total general para cerrar semana
   const granTotalIng = useMemo(() => ingresos.reduce((s, r) => s + Number(r.monto), 0), [ingresos])
   const granTotalGas = useMemo(() => gastos.reduce((s, r) => s + Number(r.monto), 0), [gastos])
-  const granBalance = granTotalIng - granTotalGas
+  const granBalance  = granTotalIng - granTotalGas
 
-  function handleRowClick(fecha) {
+  // Click en celda: ingreso directo, gasto directo, o elegir
+  function handleCellClick(fecha, tipo = null) {
     setClickedFecha(fecha)
-    setTipoModalOpen(true)
+    if (tipo) {
+      openForm(tipo, fecha)
+    } else {
+      setTipoModalOpen(true)
+    }
   }
 
-  function handleTipoSelect(tipo) {
+  function openForm(tipo, fecha) {
+    const defaultUnidadId = filtroUnidad ? String(filtroUnidad) : ''
     setTipoSeleccionado(tipo)
-    setTipoModalOpen(false)
     setAlertaMant(null)
     setGastosRecientes([])
     setPaginaMeses(0)
-    const defaultUnidadId = filtroUnidad ? String(filtroUnidad) : ''
     if (tipo === 'ingreso') {
-      setFormIngreso({ unidad_id: String(defaultUnidadId), fecha: clickedFecha, monto: '', notas: '' })
+      setFormIngreso({ unidad_id: defaultUnidadId, fecha, monto: '', notas: '' })
     } else {
-      setFormGasto({ unidad_id: String(defaultUnidadId), fecha: clickedFecha, concepto: '', monto: '', categoria_id: '', notas: '' })
+      setFormGasto({ unidad_id: defaultUnidadId, fecha, concepto: '', monto: '', categoria_id: '', notas: '' })
       if (defaultUnidadId) fetchGastosRecientes(defaultUnidadId, 0)
     }
     setFormModalOpen(true)
   }
 
+  function handleTipoSelect(tipo) {
+    setTipoModalOpen(false)
+    openForm(tipo, clickedFecha)
+  }
+
   async function handleSaveIngreso() {
     if (!formIngreso.unidad_id || !formIngreso.fecha || !formIngreso.monto) {
-      toast.error('Complete los campos obligatorios')
-      return
+      toast.error('Complete los campos obligatorios'); return
     }
     setSaving(true)
     try {
@@ -191,11 +185,8 @@ export default function ResumenSemanal() {
       toast.success('Ingreso registrado')
       setFormModalOpen(false)
       fetchData()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (err) { toast.error(err.message) }
+    finally { setSaving(false) }
   }
 
   async function fetchGastosRecientes(unidad_id, pagina = 0) {
@@ -244,8 +235,7 @@ export default function ResumenSemanal() {
 
   async function handleSaveGasto() {
     if (!formGasto.unidad_id || !formGasto.fecha || !formGasto.monto || !formGasto.concepto || !formGasto.categoria_id) {
-      toast.error('Complete los campos obligatorios')
-      return
+      toast.error('Complete los campos obligatorios'); return
     }
     setSaving(true)
     try {
@@ -264,22 +254,15 @@ export default function ResumenSemanal() {
       toast.success('Gasto registrado')
       setFormModalOpen(false)
       fetchData()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (err) { toast.error(err.message) }
+    finally { setSaving(false) }
   }
 
   async function cerrarSemana() {
-    if (!isAdmin) {
-      toast.error('Solo la administradora puede cerrar la semana')
-      return
-    }
+    if (!isAdmin) { toast.error('Solo la administradora puede cerrar la semana'); return }
     try {
       const { error } = await supabase.from('cortes_semanales').upsert({
-        semana_iso: semana,
-        anio,
+        semana_iso: semana, anio,
         total_ingresos: granTotalIng,
         total_gastos: granTotalGas,
         balance: granBalance,
@@ -289,18 +272,17 @@ export default function ResumenSemanal() {
       })
       if (error) throw error
       toast.success('Semana cerrada exitosamente')
-    } catch (err) {
-      toast.error(err.message)
-    }
+    } catch (err) { toast.error(err.message) }
   }
 
   const unidadLabel = filtroUnidad
     ? (() => { const u = unidades.find(x => x.id === filtroUnidad); return u ? `${labelUnidad(u)} — ${u.chofer}` : 'Unidad' })()
     : 'General'
 
+  // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div>
-      <PageHeader title="Resumen Semanal" subtitle="Ingresos y gastos por día">
+      <PageHeader title="Resumen Semanal V2" subtitle="Vista por días — propuesta alternativa">
         {isAdmin && (
           <button onClick={cerrarSemana} className="btn-primary">
             <Lock className="w-4 h-4" />
@@ -310,11 +292,8 @@ export default function ResumenSemanal() {
       </PageHeader>
 
       {/* Navegación de semanas */}
-      <div className="flex items-center justify-center gap-4 mb-6">
-        <button
-          onClick={() => cambiarSemana(-1)}
-          className="p-2 rounded-xl hover:bg-pizarra-700/50 text-pizarra-400 transition-colors"
-        >
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <button onClick={() => cambiarSemana(-1)} className="p-2 rounded-xl hover:bg-pizarra-700/50 text-pizarra-400 transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="text-center">
@@ -323,10 +302,7 @@ export default function ResumenSemanal() {
             {formatDateShort(diasSemana[0])} — {formatDateShort(diasSemana[6])}, {anio}
           </p>
         </div>
-        <button
-          onClick={() => cambiarSemana(1)}
-          className="p-2 rounded-xl hover:bg-pizarra-700/50 text-pizarra-400 transition-colors"
-        >
+        <button onClick={() => cambiarSemana(1)} className="p-2 rounded-xl hover:bg-pizarra-700/50 text-pizarra-400 transition-colors">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -339,9 +315,9 @@ export default function ResumenSemanal() {
         <EmptyState icon={CalendarRange} title="Sin datos" message="No hay unidades activas para mostrar." />
       ) : (
         <>
-          {/* Barra de filtros: unidad + tipo de gasto */}
+          {/* Barra de filtros encima de la tabla */}
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            {/* Filtro unidad — fuera del overflow para no ser recortado */}
+            {/* Filtro unidad — fuera del overflow-x-auto */}
             <div className="relative" ref={unitDropdownRef}>
               <button
                 onClick={() => setShowUnitDropdown(v => !v)}
@@ -370,7 +346,43 @@ export default function ResumenSemanal() {
                       className={`w-full text-left px-4 py-2.5 text-sm hover:bg-pizarra-700 transition-colors ${i === unidades.length - 1 ? 'rounded-b-xl' : ''} ${filtroUnidad === u.id ? 'text-taxi-400 font-semibold bg-taxi-500/5' : 'text-pizarra-300'}`}
                     >
                       <span className="font-mono text-taxi-500">{labelUnidad(u)}</span>
-                      <span className="ml-2 text-pizarra-400">{u.chofer}</span>
+                      <span className="ml-2 text-pizarra-400 text-xs">{u.chofer}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative" ref={gastoDropdownRef}>
+              <button
+                onClick={e => { e.stopPropagation(); setShowGastoDropdown(v => !v) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  filtroGasto
+                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                    : 'bg-pizarra-700/50 text-pizarra-400 hover:bg-pizarra-700 border-pizarra-600/50'
+                }`}
+              >
+                <Filter className="w-3 h-3" />
+                Gastos: {filtroGasto ? (LABEL_CATEGORIA[filtroGasto] ?? filtroGasto) : 'Todos'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${showGastoDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showGastoDropdown && (
+                <div className="absolute top-full mt-1 right-0 z-30 bg-pizarra-800 border border-pizarra-700/70 rounded-xl shadow-2xl min-w-[160px] overflow-hidden">
+                  <button
+                    onClick={() => { setFiltroGasto(null); setShowGastoDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-pizarra-700 transition-colors ${!filtroGasto ? 'text-taxi-400 font-semibold bg-taxi-500/5' : 'text-pizarra-300'}`}
+                  >
+                    Todos
+                  </button>
+                  <div className="border-t border-pizarra-700/50" />
+                  {NOMBRES_CATEGORIA.map(nombre => (
+                    <button
+                      key={nombre}
+                      onClick={() => { setFiltroGasto(nombre); setShowGastoDropdown(false) }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-pizarra-700 transition-colors ${filtroGasto === nombre ? 'text-red-400 font-semibold bg-red-500/5' : 'text-pizarra-300'}`}
+                    >
+                      {LABEL_CATEGORIA[nombre] ?? nombre}
                     </button>
                   ))}
                 </div>
@@ -381,127 +393,108 @@ export default function ResumenSemanal() {
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+
+                {/* ── ENCABEZADOS: primera celda = filtro unidad, resto = días ── */}
                 <thead>
                   <tr className="border-b border-pizarra-700/50">
-                    <th className="table-header">{unidadLabel}</th>
 
-                    {/* Columna 2: Ingreso */}
-                    <th className="table-header text-right">Ingreso</th>
-
-                    {/* Columna 3: Gasto con filtro de tipo */}
-                    <th className="table-header text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <span>Gasto</span>
-                        <div className="relative" ref={gastoDropdownRef}>
-                          <button
-                            onClick={e => { e.stopPropagation(); setShowGastoDropdown(v => !v) }}
-                            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-colors ${
-                              filtroGasto
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                : 'bg-pizarra-700/50 text-pizarra-400 hover:bg-pizarra-700 border border-transparent'
-                            }`}
-                          >
-                            <Filter className="w-3 h-3" />
-                            {filtroGasto ? (LABEL_CATEGORIA[filtroGasto] ?? filtroGasto) : 'Filtrar'}
-                          </button>
-
-                          {showGastoDropdown && (
-                            <div className="absolute top-full mt-1 right-0 z-30 bg-pizarra-800 border border-pizarra-700/70 rounded-xl shadow-2xl min-w-[160px] overflow-hidden">
-                              <button
-                                onClick={() => { setFiltroGasto(null); setShowGastoDropdown(false) }}
-                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-pizarra-700 transition-colors ${
-                                  !filtroGasto ? 'text-taxi-400 font-semibold bg-taxi-500/5' : 'text-pizarra-300'
-                                }`}
-                              >
-                                Todos
-                              </button>
-                              <div className="border-t border-pizarra-700/50" />
-                              {NOMBRES_CATEGORIA.map(nombre => (
-                                <button
-                                  key={nombre}
-                                  onClick={() => { setFiltroGasto(nombre); setShowGastoDropdown(false) }}
-                                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-pizarra-700 transition-colors ${
-                                    filtroGasto === nombre ? 'text-red-400 font-semibold bg-red-500/5' : 'text-pizarra-300'
-                                  }`}
-                                >
-                                  {LABEL_CATEGORIA[nombre] ?? nombre}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    {/* Columna 1: etiqueta de la unidad seleccionada */}
+                    <th className="table-header sticky left-0 bg-pizarra-800/95 z-20 min-w-[120px] text-taxi-400 font-semibold">
+                      {unidadLabel}
                     </th>
 
-                    {/* Columna 4: Balance */}
-                    <th className="table-header text-right">Balance</th>
+                    {/* Columnas de días */}
+                    {diasSemana.map((fecha, i) => (
+                      <th key={fecha} className="table-header text-center min-w-[110px]">
+                        <div className="font-semibold">{DIAS_SEMANA[i]}</div>
+                        <div className="text-[10px] text-pizarra-500 font-normal">{formatDateShort(fecha)}</div>
+                      </th>
+                    ))}
+
+                    {/* Columna total */}
+                    <th className="table-header text-right min-w-[110px]">Total</th>
                   </tr>
                 </thead>
 
+                {/* ── FILAS: Ingreso / Gasto / Balance ── */}
                 <tbody className="divide-y divide-pizarra-700/30">
-                  {tablaDias.map(dia => (
-                    <tr
-                      key={dia.fecha}
-                      onClick={() => handleRowClick(dia.fecha)}
-                      className="hover:bg-pizarra-700/30 cursor-pointer transition-colors group"
-                    >
-                      {/* Día en la primera columna (bajo el selector de unidad) */}
-                      <td className="table-cell">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <div className="font-semibold text-pizarra-200">{dia.diaNombre}</div>
-                            <div className="text-xs text-pizarra-500">{formatDateShort(dia.fecha)}</div>
-                          </div>
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-pizarra-600 text-xs">
-                            + agregar
-                          </span>
-                        </div>
-                      </td>
 
-                      <td className="table-cell text-right font-mono">
-                        {dia.ingresos > 0
-                          ? <span className="text-emerald-400">+{formatMXN(dia.ingresos)}</span>
-                          : <span className="text-pizarra-700">—</span>
-                        }
-                      </td>
-                      <td className="table-cell text-right font-mono">
-                        {dia.gastos > 0
-                          ? <span className="text-red-400">-{formatMXN(dia.gastos)}</span>
-                          : <span className="text-pizarra-700">—</span>
-                        }
-                      </td>
-                      <td className={`table-cell text-right font-mono font-bold ${dia.hasData ? balanceColor(dia.balance) : 'text-pizarra-700'}`}>
-                        {dia.hasData ? formatMXN(dia.balance) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-
-                <tfoot>
-                  <tr className="border-t-2 border-pizarra-600/50 bg-pizarra-800/60">
-                    <td className="table-cell font-display font-bold text-pizarra-200">
-                      Total semana
-                      {filtroGasto && (
-                        <span className="ml-2 text-xs font-normal text-red-400">({LABEL_CATEGORIA[filtroGasto] ?? filtroGasto})</span>
-                      )}
+                  {/* Fila Ingreso */}
+                  <tr className="hover:bg-emerald-500/5 transition-colors group">
+                    <td className="table-cell sticky left-0 bg-pizarra-800/95 z-10">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        <span className="text-emerald-400 font-semibold text-xs uppercase tracking-wide">Ingreso</span>
+                      </div>
                     </td>
+                    {totalesPorDia.map(d => (
+                      <td
+                        key={d.fecha}
+                        onClick={() => handleCellClick(d.fecha, 'ingreso')}
+                        className="table-cell text-center font-mono cursor-pointer hover:bg-emerald-500/10 transition-colors rounded"
+                        title="Clic para agregar ingreso"
+                      >
+                        {d.ing > 0
+                          ? <span className="text-emerald-400">+{formatMXN(d.ing)}</span>
+                          : <span className="text-pizarra-700 group-hover:text-pizarra-600 text-xs">+ agregar</span>
+                        }
+                      </td>
+                    ))}
                     <td className="table-cell text-right font-mono font-bold text-emerald-400">
                       {formatMXN(totalIng)}
                     </td>
+                  </tr>
+
+                  {/* Fila Gasto */}
+                  <tr className="hover:bg-red-500/5 transition-colors group">
+                    <td className="table-cell sticky left-0 bg-pizarra-800/95 z-10">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                        <span className="text-red-400 font-semibold text-xs uppercase tracking-wide">Gasto</span>
+                        {filtroGasto && (
+                          <span className="text-[10px] text-red-400/70 font-normal">({LABEL_CATEGORIA[filtroGasto] ?? filtroGasto})</span>
+                        )}
+                      </div>
+                    </td>
+                    {totalesPorDia.map(d => (
+                      <td
+                        key={d.fecha}
+                        onClick={() => handleCellClick(d.fecha, 'gasto')}
+                        className="table-cell text-center font-mono cursor-pointer hover:bg-red-500/10 transition-colors rounded"
+                        title="Clic para agregar gasto"
+                      >
+                        {d.gas > 0
+                          ? <span className="text-red-400">-{formatMXN(d.gas)}</span>
+                          : <span className="text-pizarra-700 group-hover:text-pizarra-600 text-xs">+ agregar</span>
+                        }
+                      </td>
+                    ))}
                     <td className="table-cell text-right font-mono font-bold text-red-400">
                       {formatMXN(totalGas)}
                     </td>
+                  </tr>
+
+                  {/* Fila Balance */}
+                  <tr className="bg-pizarra-800/40">
+                    <td className="table-cell sticky left-0 bg-pizarra-800/95 z-10">
+                      <span className="text-pizarra-300 font-bold text-xs uppercase tracking-wide">Balance</span>
+                    </td>
+                    {totalesPorDia.map(d => (
+                      <td key={d.fecha} className={`table-cell text-center font-mono font-semibold ${(d.ing > 0 || d.gas > 0) ? balanceColor(d.bal) : 'text-pizarra-700'}`}>
+                        {(d.ing > 0 || d.gas > 0) ? formatMXN(d.bal) : '—'}
+                      </td>
+                    ))}
                     <td className={`table-cell text-right font-mono font-bold text-lg ${balanceColor(totalBal)}`}>
                       {formatMXN(totalBal)}
                     </td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             </div>
           </div>
 
           <p className="text-center text-xs text-pizarra-600 mt-3">
-            Haz clic en cualquier día para agregar un ingreso o gasto
+            Clic en una celda de Ingreso o Gasto para registrar un movimiento
           </p>
         </>
       )}
@@ -542,48 +535,24 @@ export default function ResumenSemanal() {
           <div className="space-y-4">
             <div>
               <label className="label">Unidad *</label>
-              <select
-                className="input"
-                value={formIngreso.unidad_id}
-                onChange={e => setFormIngreso({ ...formIngreso, unidad_id: e.target.value })}
-              >
+              <select className="input" value={formIngreso.unidad_id} onChange={e => setFormIngreso({ ...formIngreso, unidad_id: e.target.value })}>
                 <option value="">Seleccionar unidad</option>
-                {unidades.map(u => (
-                  <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>
-                ))}
+                {unidades.map(u => <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Fecha *</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={formIngreso.fecha}
-                  onChange={e => setFormIngreso({ ...formIngreso, fecha: e.target.value })}
-                />
+                <input type="date" className="input" value={formIngreso.fecha} onChange={e => setFormIngreso({ ...formIngreso, fecha: e.target.value })} />
               </div>
               <div>
                 <label className="label">Monto *</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={formIngreso.monto}
-                  onChange={e => setFormIngreso({ ...formIngreso, monto: e.target.value })}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
+                <input type="number" className="input" value={formIngreso.monto} onChange={e => setFormIngreso({ ...formIngreso, monto: e.target.value })} placeholder="0.00" min="0" step="0.01" />
               </div>
             </div>
             <div>
               <label className="label">Notas</label>
-              <input
-                className="input"
-                value={formIngreso.notas}
-                onChange={e => setFormIngreso({ ...formIngreso, notas: e.target.value })}
-                placeholder="Observaciones (opcional)"
-              />
+              <input className="input" value={formIngreso.notas} onChange={e => setFormIngreso({ ...formIngreso, notas: e.target.value })} placeholder="Observaciones (opcional)" />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setFormModalOpen(false)} className="btn-secondary">Cancelar</button>
@@ -599,7 +568,6 @@ export default function ResumenSemanal() {
               <p className="text-xs font-semibold text-pizarra-400 uppercase tracking-wider mb-3">
                 Gastos anteriores
               </p>
-              {/* Paginación por período de 3 meses */}
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => { const p = paginaMeses + 1; setPaginaMeses(p); fetchGastosRecientes(formGasto.unidad_id, p) }}
@@ -657,9 +625,7 @@ export default function ResumenSemanal() {
                     }}
                   >
                     <option value="">Seleccionar unidad</option>
-                    {unidades.map(u => (
-                      <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>
-                    ))}
+                    {unidades.map(u => <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>)}
                   </select>
                 </div>
                 <div>
@@ -673,12 +639,9 @@ export default function ResumenSemanal() {
                     }}
                   >
                     <option value="">Seleccionar</option>
-                    {categorias
-                      .filter(c => NOMBRES_CATEGORIA.includes(c.nombre))
-                      .map(c => (
-                        <option key={c.id} value={c.id}>{LABEL_CATEGORIA[c.nombre] ?? c.nombre}</option>
-                      ))
-                    }
+                    {categorias.filter(c => NOMBRES_CATEGORIA.includes(c.nombre)).map(c => (
+                      <option key={c.id} value={c.id}>{LABEL_CATEGORIA[c.nombre] ?? c.nombre}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -696,9 +659,7 @@ export default function ResumenSemanal() {
                     }}
                   >
                     <option value="">Sin especificar</option>
-                    {ITEMS_MANTENIMIENTO.map(i => (
-                      <option key={i.tipo} value={i.tipo}>{i.label}</option>
-                    ))}
+                    {ITEMS_MANTENIMIENTO.map(i => <option key={i.tipo} value={i.tipo}>{i.label}</option>)}
                   </select>
                 </div>
               )}

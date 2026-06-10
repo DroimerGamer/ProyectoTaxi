@@ -66,6 +66,17 @@ export function getWeekRange(weekNumber, year) {
 export const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 /**
+ * Retorna la etiqueta de una unidad.
+ * Si el numero es 'ENC' o el chofer es 'Encargado', muestra solo el nombre.
+ * De lo contrario muestra #numero.
+ */
+export function labelUnidad(u) {
+  if (!u) return '—'
+  if (String(u.numero) === 'ENC' || u.chofer === 'Encargado') return u.chofer
+  return `#${u.numero}`
+}
+
+/**
  * Clase CSS según el valor del balance
  */
 export function balanceColor(value) {

@@ -9,6 +9,9 @@ import Ingresos from '@/pages/Ingresos'
 import Gastos from '@/pages/Gastos'
 import Pendientes from '@/pages/Pendientes'
 import ResumenSemanal from '@/pages/ResumenSemanal'
+import ResumenSemanalV2 from '@/pages/ResumenSemanalV2'
+import Mantenimiento from '@/pages/Mantenimiento'
+import Deudas from '@/pages/Deudas'
 import { Toaster } from 'react-hot-toast'
 
 export default function App() {
@@ -46,6 +49,9 @@ export default function App() {
             <Route path="gastos" element={<Gastos />} />
             <Route path="pendientes" element={<Pendientes />} />
             <Route path="resumen" element={<ResumenSemanal />} />
+            <Route path="resumen-v2" element={<ResumenSemanalV2 />} />
+            <Route path="mantenimiento" element={<Mantenimiento />} />
+            <Route path="deudas" element={<Deudas />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
