@@ -5,7 +5,7 @@ import { formatMXN, formatDate } from '@/lib/helpers'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
-import { TrendingUp, Plus, Pencil, Loader2, Download, Filter } from 'lucide-react'
+import { TrendingUp, Plus, Pencil, Loader2, Download, Filter, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Ingresos() {
@@ -80,6 +80,18 @@ export default function Ingresos() {
     })
     setEditId(ingreso.id)
     setModalOpen(true)
+  }
+
+  async function handleDelete(ingreso) {
+    if (!window.confirm(`¿Eliminar este ingreso de ${formatMXN(ingreso.monto)}? Esta acción no se puede deshacer.`)) return
+    try {
+      const { error } = await supabase.from('ingresos').delete().eq('id', ingreso.id)
+      if (error) throw error
+      toast.success('Ingreso eliminado')
+      fetchIngresos()
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   async function handleSave() {
@@ -237,12 +249,20 @@ export default function Ingresos() {
                       {i.notas || '—'}
                     </td>
                     <td className="table-cell text-right">
-                      <button
-                        onClick={() => openEdit(i)}
-                        className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(i)}
+                          className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(i)}
+                          className="p-2 rounded-lg hover:bg-red-500/10 text-pizarra-400 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

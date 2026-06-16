@@ -4,7 +4,7 @@ import { useSupabaseQuery } from '@/hooks/useSupabaseQuery'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
-import { Car, Plus, Pencil, Loader2 } from 'lucide-react'
+import { Car, Plus, Pencil, Loader2, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const EMPTY_FORM = { numero: '', placas: '', chofer: '', permiso: '', activa: true }
@@ -66,6 +66,18 @@ export default function Unidades() {
       toast.error(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete(unidad) {
+    if (!window.confirm(`¿Eliminar la unidad #${unidad.numero} (${unidad.chofer})? Esta acción no se puede deshacer.`)) return
+    try {
+      const { error } = await supabase.from('unidades').delete().eq('id', unidad.id)
+      if (error) throw error
+      toast.success('Unidad eliminada')
+      refetch()
+    } catch (err) {
+      toast.error('No se puede eliminar: la unidad tiene registros asociados')
     }
   }
 
@@ -142,12 +154,20 @@ export default function Unidades() {
                       </button>
                     </td>
                     <td className="table-cell text-right">
-                      <button
-                        onClick={() => openEdit(u)}
-                        className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(u)}
+                          className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(u)}
+                          className="p-2 rounded-lg hover:bg-red-500/10 text-pizarra-400 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

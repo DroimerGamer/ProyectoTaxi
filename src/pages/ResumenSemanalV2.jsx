@@ -282,7 +282,7 @@ export default function ResumenSemanalV2() {
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div>
-      <PageHeader title="Resumen Semanal V2" subtitle="Vista por días — propuesta alternativa">
+      <PageHeader title="Resumen Semanal" subtitle="Ingresos y gastos por día">
         {isAdmin && (
           <button onClick={cerrarSemana} className="btn-primary">
             <Lock className="w-4 h-4" />

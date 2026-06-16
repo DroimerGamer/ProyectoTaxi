@@ -5,7 +5,7 @@ import { formatMXN, formatDate, labelUnidad } from '@/lib/helpers'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
-import { TrendingDown, Plus, Pencil, Loader2, Download, Filter, AlertTriangle } from 'lucide-react'
+import { TrendingDown, Plus, Pencil, Loader2, Download, Filter, AlertTriangle, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ITEMS_MANTENIMIENTO } from '@/lib/mantenimiento'
 
@@ -88,6 +88,18 @@ export default function Gastos() {
     setModalOpen(true)
   }
 
+  async function handleDelete(gasto) {
+    if (!window.confirm(`¿Eliminar este gasto de ${formatMXN(gasto.monto)}? Esta acción no se puede deshacer.`)) return
+    try {
+      const { error } = await supabase.from('gastos').delete().eq('id', gasto.id)
+      if (error) throw error
+      toast.success('Gasto eliminado')
+      fetchGastos()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
   function openEdit(gasto) {
     setForm({
       unidad_id: gasto.unidad_id,
@@ -160,6 +172,7 @@ export default function Gastos() {
         monto: Number(form.monto),
         notas: form.notas || null,
         mantenimiento_tipo: form.mantenimiento_tipo || null,
+        estado: 'aprobado',
         registrado_por: user.id,
       }
 
@@ -205,7 +218,6 @@ export default function Gastos() {
   }
 
   const totalFiltrado = gastos.reduce((s, g) => s + Number(g.monto), 0)
-  const estadoBadge = { pendiente: 'badge-pendiente', aprobado: 'badge-aprobado', rechazado: 'badge-rechazado' }
 
   return (
     <div>
@@ -262,7 +274,6 @@ export default function Gastos() {
                   <th className="table-header">Categoría</th>
                   <th className="table-header">Concepto</th>
                   <th className="table-header text-right">Monto</th>
-                  <th className="table-header">Estado</th>
                   <th className="table-header text-right">Acciones</th>
                 </tr>
               </thead>
@@ -278,16 +289,21 @@ export default function Gastos() {
                     </td>
                     <td className="table-cell">{g.concepto}</td>
                     <td className="table-cell text-right font-mono font-semibold text-red-400">{formatMXN(g.monto)}</td>
-                    <td className="table-cell">
-                      <span className={estadoBadge[g.estado]}>{g.estado}</span>
-                    </td>
                     <td className="table-cell text-right">
-                      <button
-                        onClick={() => openEdit(g)}
-                        className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(g)}
+                          className="p-2 rounded-lg hover:bg-pizarra-700/50 text-pizarra-400 hover:text-pizarra-200 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(g)}
+                          className="p-2 rounded-lg hover:bg-red-500/10 text-pizarra-400 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

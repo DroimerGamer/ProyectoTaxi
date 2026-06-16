@@ -17,12 +17,10 @@ import {
 
 const NAV_ITEMS = [
   { to: '/',              label: 'Dashboard',           icon: LayoutDashboard },
-  { to: '/unidades',      label: 'Unidades',            icon: Car },
+  { to: '/resumen',       label: 'Resumen Semanal',     icon: CalendarRange },
   { to: '/ingresos',      label: 'Ingresos',            icon: TrendingUp },
   { to: '/gastos',        label: 'Gastos',              icon: TrendingDown },
   { to: '/deudas',        label: 'Deudas',              icon: HandCoins },
-  { to: '/resumen',       label: 'Resumen Semanal',     icon: CalendarRange },
-  { to: '/resumen-v2',    label: 'Resumen Semanal V2',  icon: CalendarRange },
 ]
 
 export default function Sidebar({ open, onClose, onOpenCreateUser }) {

@@ -5,7 +5,7 @@ import { formatMXN, formatDate, getISOWeek, balanceColor, labelUnidad } from '@/
 import PageHeader from '@/components/PageHeader'
 import StatCard from '@/components/StatCard'
 import {
-  TrendingUp, TrendingDown, Car, ClipboardCheck, Loader2,
+  TrendingUp, TrendingDown, Car, Loader2,
   AlertTriangle, CheckCircle, Clock, HelpCircle, Wrench,
 } from 'lucide-react'
 import { ITEMS_MANTENIMIENTO, getEstadoMantenimiento, ESTADO_STYLES } from '@/lib/mantenimiento'
@@ -37,7 +37,12 @@ export default function Dashboard() {
   const [unidades, setUnidades] = useState([])
   const [ingresosSemana, setIngresosSemana] = useState([])
   const [gastosSemana, setGastosSemana] = useState([])
+  const [ingresosMesUnidad, setIngresosMesUnidad] = useState([])
+  const [gastosMesUnidad, setGastosMesUnidad] = useState([])
+  const [ingresosAnioUnidad, setIngresosAnioUnidad] = useState([])
+  const [gastosAnioUnidad, setGastosAnioUnidad] = useState([])
   const [gastosMantenimiento, setGastosMantenimiento] = useState([])
+  const [periodoUnidad, setPeriodoUnidad] = useState('semana')
 
   useEffect(() => {
     fetchDashboardData()
@@ -49,14 +54,19 @@ export default function Dashboard() {
       const semanaActual = getISOWeek(now)
       const anioActual = now.getFullYear()
 
+      const mesStr = `${anioActual}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
       // Obtener datos en paralelo
       const [
         { data: unidades_ },
         { data: ingresosSemana_ },
         { data: gastosSemana_ },
-        { count: pendientesCount },
-        { data: ingresosMes },
-        { data: gastosMes },
+        { data: ingresosMes_ },
+        { data: gastosMes_ },
+        { data: ingresosMesUnidad_ },
+        { data: gastosMesUnidad_ },
+        { data: ingresosAnioUnidad_ },
+        { data: gastosAnioUnidad_ },
         { data: gastosMantenimiento_ },
       ] = await Promise.all([
         supabase.from('unidades').select('id, numero, chofer, activa'),
@@ -69,16 +79,27 @@ export default function Dashboard() {
           .eq('semana_iso', semanaActual)
           .eq('anio', anioActual)
           .eq('estado', 'aprobado'),
-        supabase.from('gastos')
-          .select('*', { count: 'exact', head: true })
-          .eq('estado', 'pendiente'),
         supabase.from('ingresos')
           .select('monto')
-          .gte('fecha', `${anioActual}-${String(now.getMonth() + 1).padStart(2, '0')}-01`),
+          .gte('fecha', mesStr),
         supabase.from('gastos')
           .select('monto')
           .eq('estado', 'aprobado')
-          .gte('fecha', `${anioActual}-${String(now.getMonth() + 1).padStart(2, '0')}-01`),
+          .gte('fecha', mesStr),
+        supabase.from('ingresos')
+          .select('monto, unidad_id')
+          .gte('fecha', mesStr),
+        supabase.from('gastos')
+          .select('monto, unidad_id')
+          .eq('estado', 'aprobado')
+          .gte('fecha', mesStr),
+        supabase.from('ingresos')
+          .select('monto, unidad_id')
+          .gte('fecha', `${anioActual}-01-01`),
+        supabase.from('gastos')
+          .select('monto, unidad_id')
+          .eq('estado', 'aprobado')
+          .gte('fecha', `${anioActual}-01-01`),
         supabase.from('gastos')
           .select('unidad_id, mantenimiento_tipo, fecha, monto')
           .not('mantenimiento_tipo', 'is', null)
@@ -88,8 +109,8 @@ export default function Dashboard() {
 
       const totalIngresosSemana = (ingresosSemana_ || []).reduce((s, r) => s + Number(r.monto), 0)
       const totalGastosSemana = (gastosSemana_ || []).reduce((s, r) => s + Number(r.monto), 0)
-      const totalIngresosMes = (ingresosMes || []).reduce((s, r) => s + Number(r.monto), 0)
-      const totalGastosMes = (gastosMes || []).reduce((s, r) => s + Number(r.monto), 0)
+      const totalIngresosMes = (ingresosMes_ || []).reduce((s, r) => s + Number(r.monto), 0)
+      const totalGastosMes = (gastosMes_ || []).reduce((s, r) => s + Number(r.monto), 0)
       const unidadesActivas = (unidades_ || []).filter(u => u.activa).length
 
       setStats({
@@ -100,7 +121,6 @@ export default function Dashboard() {
         gastosMes: totalGastosMes,
         unidadesActivas,
         totalUnidades: (unidades_ || []).length,
-        pendientes: pendientesCount || 0,
       })
 
       // Datos para la gráfica por unidad
@@ -124,6 +144,10 @@ export default function Dashboard() {
       setUnidades(unidades_ || [])
       setIngresosSemana(ingresosSemana_ || [])
       setGastosSemana(gastosSemana_ || [])
+      setIngresosMesUnidad(ingresosMesUnidad_ || [])
+      setGastosMesUnidad(gastosMesUnidad_ || [])
+      setIngresosAnioUnidad(ingresosAnioUnidad_ || [])
+      setGastosAnioUnidad(gastosAnioUnidad_ || [])
       setGastosMantenimiento(gastosMantenimiento_ || [])
     } catch (err) {
       console.error('Error al cargar dashboard:', err)
@@ -167,13 +191,6 @@ export default function Dashboard() {
           value={`${stats?.unidadesActivas} / ${stats?.totalUnidades}`}
           color="blue"
         />
-        <StatCard
-          icon={ClipboardCheck}
-          label="Pendientes"
-          value={stats?.pendientes}
-          sublabel="gastos por revisar"
-          color="taxi"
-        />
       </div>
 
       {/* Balance */}
@@ -203,15 +220,38 @@ export default function Dashboard() {
       {/* 1. Resumen por unidad */}
       {unidades.length > 0 && (
         <div className="mb-8">
-          <h2 className="font-display font-bold text-lg text-pizarra-100 mb-4">
-            Resumen por unidad (semana actual)
-          </h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 className="font-display font-bold text-lg text-pizarra-100">
+              Resumen por unidad
+            </h2>
+            <div className="flex rounded-xl border border-pizarra-700/50 overflow-hidden">
+              {[
+                { key: 'semana', label: 'Semana' },
+                { key: 'mes',    label: 'Mes' },
+                { key: 'año',    label: 'Año' },
+              ].map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setPeriodoUnidad(p.key)}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                    periodoUnidad === p.key
+                      ? 'bg-taxi-500 text-pizarra-900'
+                      : 'text-pizarra-400 hover:text-pizarra-200 hover:bg-pizarra-700/50'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {unidades.map(u => {
-              const ing = ingresosSemana
+              const ingSrc = periodoUnidad === 'semana' ? ingresosSemana : periodoUnidad === 'mes' ? ingresosMesUnidad : ingresosAnioUnidad
+              const gasSrc = periodoUnidad === 'semana' ? gastosSemana : periodoUnidad === 'mes' ? gastosMesUnidad : gastosAnioUnidad
+              const ing = ingSrc
                 .filter(i => i.unidad_id === u.id)
                 .reduce((s, r) => s + Number(r.monto), 0)
-              const gas = gastosSemana
+              const gas = gasSrc
                 .filter(g => g.unidad_id === u.id)
                 .reduce((s, r) => s + Number(r.monto), 0)
               const balance = ing - gas
