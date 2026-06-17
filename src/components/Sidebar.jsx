@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { to: '/ingresos',      label: 'Ingresos',            icon: TrendingUp },
   { to: '/gastos',        label: 'Gastos',              icon: TrendingDown },
   { to: '/deudas',        label: 'Deudas',              icon: HandCoins },
+  { to: '/unidades',      label: 'Unidades',            icon: Car },
 ]
 
 export default function Sidebar({ open, onClose, onOpenCreateUser }) {

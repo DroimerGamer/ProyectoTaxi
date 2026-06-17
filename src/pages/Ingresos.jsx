@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { formatMXN, formatDate } from '@/lib/helpers'
+import { formatMXN, formatDate, labelUnidad } from '@/lib/helpers'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
@@ -179,7 +179,7 @@ export default function Ingresos() {
           >
             <option value="">Todas las unidades</option>
             {unidades.map(u => (
-              <option key={u.id} value={u.id}>#{u.numero} — {u.chofer}</option>
+              <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>
             ))}
           </select>
           <input
@@ -288,7 +288,7 @@ export default function Ingresos() {
             >
               <option value="">Seleccionar unidad</option>
               {unidades.map(u => (
-                <option key={u.id} value={u.id}>#{u.numero} — {u.chofer}</option>
+                <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>
               ))}
             </select>
           </div>

@@ -281,7 +281,10 @@ export default function Gastos() {
                 {gastos.map((g) => (
                   <tr key={g.id} className="hover:bg-pizarra-700/20 transition-colors">
                     <td className="table-cell text-pizarra-300">{formatDate(g.fecha)}</td>
-                    <td className="table-cell font-mono font-semibold text-taxi-400">{labelUnidad(g.unidades)}</td>
+                    <td className="table-cell">
+                      <span className="font-mono font-semibold text-taxi-400">{labelUnidad(g.unidades)}</span>
+                      <span className="block text-sm text-pizarra-500">{g.unidades?.chofer}</span>
+                    </td>
                     <td className="table-cell text-pizarra-400">
                       {g.categorias_gasto?.nombre
                         ? (LABEL_CATEGORIA[g.categorias_gasto.nombre] ?? g.categorias_gasto.nombre)
@@ -331,7 +334,7 @@ export default function Gastos() {
               >
                 <option value="">Seleccionar</option>
                 {unidades.map(u => (
-                  <option key={u.id} value={u.id}>{labelUnidad(u)}</option>
+                  <option key={u.id} value={u.id}>{labelUnidad(u)} — {u.chofer}</option>
                 ))}
               </select>
             </div>
